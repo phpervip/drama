@@ -1077,3 +1077,52 @@ def fake_video_bytes(prompt, out, image="", seconds=0, timeout=0,
     with open(out, "wb") as f:
         f.write(b"MP4:" + out.encode().split(b"\\")[-1])
     return out
+
+
+def test_resolve_asset_image_fills_path_from_base(book):
+    """缺 path：按 base/<safe_name>.png 回退，原地写回供缩略图加载。"""
+    state, tmp = book
+    base = tmp / dramavideo._ASSET_DIR / dramavideo._ASSET_GLOBAL
+    base.mkdir(parents=True, exist_ok=True)
+    png = base / "林夏.png"
+    png.write_bytes(b"PNG")
+    info = {"type": "角色", "appearance": "黑长直"}
+    out = dramavideo._resolve_asset_image(state, "林夏", info, base=str(base))
+    assert info["path"] == str(png)
+    assert out == str(png)
+
+
+def test_resolve_asset_image_keeps_existing_abs_path(book):
+    """绝对 path 已存在：不改动。"""
+    state, tmp = book
+    base = tmp / "store"
+    base.mkdir(parents=True, exist_ok=True)
+    abs_png = tmp / "elsewhere.png"
+    abs_png.write_bytes(b"PNG")
+    info = {"type": "角色", "path": str(abs_png)}
+    out = dramavideo._resolve_asset_image(state, "林夏", info, base=str(base))
+    assert info["path"] == str(abs_png)
+    assert out == str(abs_png)
+
+
+def test_resolve_asset_image_joins_relative_path_under_base(book):
+    """相对 path：与 base 拼接后命中文件。"""
+    state, tmp = book
+    base = tmp / "store"
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "林夏.png").write_bytes(b"PNG")
+    info = {"type": "角色", "path": "林夏.png"}
+    out = dramavideo._resolve_asset_image(state, "林夏", info, base=str(base))
+    assert info["path"] == str(base / "林夏.png")
+    assert out == info["path"]
+
+
+def test_resolve_asset_image_missing_file_leaves_path(book):
+    """各候选都不存在：保留原 path（空则仍空），由 _thumb 降级。"""
+    state, tmp = book
+    base = tmp / "empty"
+    base.mkdir(parents=True, exist_ok=True)
+    info = {"type": "道具"}
+    assert dramavideo._resolve_asset_image(
+        state, "水桶", info, base=str(base)) == ""
+    assert info.get("path") in (None, "")

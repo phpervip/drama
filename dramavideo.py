@@ -776,6 +776,49 @@ def _resolve_asset_path(state: dict, name: str, info: dict,
             os.path.join(base, f"{_safe_name(name)}.png"))
 
 
+def _resolve_asset_image(state: dict, name: str, info: dict,
+                         base: str = "") -> str:
+    """原地补全 info['path'] 供缩略图/下游使用；返回解析后的路径（可能仍为空）。
+
+    工作台资产卡片渲染前调用（b9c2520 只加了调用方）：
+    - 绝对 path 已存在 → 原样保留；
+    - 相对 path → 与 base（cast.json/assets.json 所在目录）拼接；
+    - path 缺失/文件不存在 → 依次尝试 base/<safe_name>.png、
+      base/<basename(path)>、全书默认目录同名 png；
+    - 都未命中 → 保留原 path（空则仍空），由调用方 _thumb 降级。
+    只读探测，不写盘、不改 json。
+    """
+    if not isinstance(info, dict):
+        return ""
+    path = str(info.get("path") or "").strip()
+    if path and os.path.exists(path):
+        info["path"] = path
+        return path
+    cands = []
+    if base:
+        if path and not os.path.isabs(path):
+            cands.append(os.path.join(base, path))
+        cands.append(os.path.join(base, f"{_safe_name(name)}.png"))
+        if path and os.path.basename(path) not in ("", os.sep):
+            cands.append(os.path.join(base, os.path.basename(path)))
+    try:
+        cands.append(_resolve_asset_path(state, name, info)[1])
+    except Exception:                    # noqa: BLE001  state 不完整时忽略
+        pass
+    seen = set()
+    for c in cands:
+        c = os.path.normpath(c) if c else ""
+        if not c or c in seen:
+            continue
+        seen.add(c)
+        if os.path.exists(c):
+            info["path"] = c
+            return c
+    if path:
+        info["path"] = path              # 保留原值（含失效绝对路径）便于排查
+    return path
+
+
 def _global_base(state: dict) -> str:
     return os.path.join(_book_dir(state), _ASSET_DIR, _ASSET_GLOBAL)
 
