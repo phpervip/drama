@@ -46,7 +46,7 @@ def _feature(key: str, default: bool = True) -> bool:
         return default
 
 
-_BUILD_TAG = "0919-1"         # 多实例混用时一眼可辨窗口新旧
+_BUILD_TAG = "0924-1"         # 多实例混用时一眼可辨窗口新旧
 
 # 粘贴文本常夹带的零宽/格式字符：肉眼不可见，但会混进命令名导致
 # 「/novel\u200bstart」≠「/novel」这类未知命令误判。它们本质是软换行点，
@@ -1281,8 +1281,18 @@ class App:
             self.center, state="disabled", wrap="word",
             font=(FONT_MONO, self._font_chat), padx=16, pady=12,
             relief="flat", borderwidth=0,
-            background=theme.PANEL, fg=theme.TEXT)
+            background=theme.PANEL, fg=theme.TEXT,
+            insertbackground=theme.TEXT)   # 光标米白，黑底可辨
         self.chat.pack(fill="both", expand=True, padx=16, pady=(0, 4))
+        # ScrolledText 内嵌经典 tk.Scrollbar，不吃 ttk 的 Vertical.TScrollbar
+        # 样式；option_add 建立时已生效，这里再兜一层防旧配置残留。
+        try:
+            self.chat.vbar.configure(
+                background=theme.BORDER, troughcolor=theme.PANEL,
+                activebackground=theme.MUTED, highlightthickness=0,
+                relief="flat", activerelief="flat", borderwidth=0, width=10)
+        except Exception:            # noqa: BLE001  无 vbar（异常 ScrolledText）不阻断
+            pass
         self._setup_chat_copy()
         # Esc：运行中 = 停止任务（审批/帮助弹窗自有 Esc 绑定，grab 期间不冲突）
         self.root.bind("<Escape>", self._on_escape)
@@ -1388,7 +1398,8 @@ class App:
 
         self.input = tk.Text(bottom, height=3, width=8,
                              font=(FONT_MONO, self._font_chat + 1), wrap="word",
-                             relief="flat", padx=12, pady=10, highlightthickness=0)
+                             relief="flat", padx=12, pady=10, highlightthickness=0,
+                             insertbackground=theme.TEXT)  # 光标随色板，暗色下不黑
         self.input.pack(side="left", fill="both", expand=True)
         # 回车发送；Shift+回车换行；Ctrl/⌘+回车=运行中排队、空闲直接发送。
         # 绑定处理器必须 return "break"：裸 lambda 返回 None 时，
@@ -8533,7 +8544,9 @@ def launch():
         dnd_ready = False
     _load_bundled_fonts()   # 先注册项目自带字体，再让 _setup_fonts 能查到它们
     _setup_fonts(root)
+    theme.load(config.get_theme())       # models.json "theme": light|dark（默认 light）
     theme.apply(root, base_font=FONT_UI, mono_font=FONT_MONO)   # 设计令牌 + ttk 定制
+    theme.apply_title_bar(root)       # Win：系统标题栏 dark=黑底白字（失败静默）
     app = App(root)
     # 异常统一上报：Tk 回调 + 工作线程异常写日志（CONFIG_DIR/logs/ui_errors.log）
     # 并提示到状态栏——GUI 里异常只进 stderr、界面无感，是难排查问题的根源

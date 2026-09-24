@@ -353,6 +353,29 @@ def set_language(lang: str):
         _save_models_data(data)
 
 
+def get_theme() -> str:
+    """界面主题：models.json 顶层 "theme"（"light" | "dark"），缺省 light。
+
+    值非法/缺失/文件损坏一律回退 light；深色在启动时由 theme.load 应用。
+    """
+    try:
+        v = str(_load_models_data().get("theme", "") or "").strip().lower()
+        return v if v in ("light", "dark") else "light"
+    except Exception:                # noqa: BLE001
+        return "light"
+
+
+def set_theme(name: str):
+    """保存界面主题；仅接受 light/dark，其它值落盘为 light。"""
+    data = _load_models_data()
+    name = str(name or "").strip().lower()
+    if name not in ("light", "dark"):
+        name = "light"
+    if data.get("theme") != name:
+        data["theme"] = name
+        _save_models_data(data)
+
+
 def get_standalone() -> bool:
     """独立提问模式：True = 每条消息不带历史上下文单独发送。缺省 False。"""
     try:

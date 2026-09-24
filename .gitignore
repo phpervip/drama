@@ -50,3 +50,4 @@ novels/
 _seedance_test.mp4
 # 应用生成的媒体产物（截图/测试图）
 media/
+.gstack/

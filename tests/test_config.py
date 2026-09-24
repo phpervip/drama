@@ -47,6 +47,37 @@ def test_language_roundtrip():
         config.set_language(old)
 
 
+def test_theme_defaults_to_light_and_roundtrip():
+    old = config.get_theme()
+    try:
+        config.set_theme("dark")
+        assert config.get_theme() == "dark"
+        config.set_theme("light")
+        assert config.get_theme() == "light"
+        # 非法值收敛为 light
+        config.set_theme("blue")
+        assert config.get_theme() == "light"
+    finally:
+        config.set_theme(old)
+
+
+def test_theme_falls_back_on_broken_models(monkeypatch):
+    def boom():
+        raise RuntimeError("bad json")
+    monkeypatch.setattr(config, "_load_models_data", boom)
+    assert config.get_theme() == "light"
+    # 缺键 / 空串 / 未知字符串 → light
+    monkeypatch.setattr(config, "_load_models_data",
+                        lambda: {})
+    assert config.get_theme() == "light"
+    monkeypatch.setattr(config, "_load_models_data",
+                        lambda: {"theme": "midnight"})
+    assert config.get_theme() == "light"
+    monkeypatch.setattr(config, "_load_models_data",
+                        lambda: {"theme": "DARK"})
+    assert config.get_theme() == "dark"
+
+
 def test_model_config_defaults():
     m = config.ModelConfig(key="p/m", provider_name="p", model_id="m",
                            display_name="M", base_url="http://x", api_key="k")
